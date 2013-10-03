@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009"
+			   xmlns:s="library://ns.adobe.com/flex/spark"
+			   xmlns:mx="library://ns.adobe.com/flex/mx"
+			   minWidth="955"
+			   minHeight="600"
+			   creationComplete="inited(event)">
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+
+			import spark.components.Alert;
+
+			import org.idream.pomelo.Pomelo;
+			import org.idream.pomelo.PomeloEvent;
+			private var pomelo:Pomelo;
+
+			protected function inited(event:FlexEvent):void
+			{
+				pomelo=Pomelo.getIns();
+				connect();
+			}
+
+			protected function login_mouseDownHandler(event:MouseEvent):void
+			{
+				if (!connected)
+					connect();
+				else
+					doLogin();
+			}
+
+			private function doLogin():void
+			{
+				pomelo.request("gate.gateHandler.queryEntry", {uid: 'test'}, function(response:Object):void
+				{
+					trace("response host:", response.host, " port:", response.port);
+					if (response.code == '500')
+					{
+						Alert.show(response.message);
+						return;
+					}
+					pomelo.init(response.host, response.port, null, function(response:Object):void
+					{
+						trace(response);
+						var route:String="connector.entryHandler.enter";
+						roomID=room.text;
+						pomelo.request(route, {username: username.text, rid: room.text}, function(data:Object):void
+						{
+							pomelo.addEventListener('onAdd', addUserHandler);
+							pomelo.addEventListener('onLeave', removeUserHandler);
+							pomelo.addEventListener('onChat', chatHandler);
+							users=new ArrayCollection(data.users);
+							currentState='chat';
+						});
+					});
+				});
+			}
+
+			private var roomID:String;
+
+			[Bindable]
+			private var users:ArrayCollection;
+
+			protected function addUserHandler(event:PomeloEvent):void
+			{
+				trace(event.message);
+				users.addItem(event.message.user);
+			}
+
+			protected function removeUserHandler(event:PomeloEvent):void
+			{
+				trace(event.message);
+				users.removeItem(event.message.user);
+			}
+
+			protected function chatHandler(event:PomeloEvent):void
+			{
+				var o:Object=event.message;
+				msg.text+='用户' + o.from + '说: ' + o.msg + '\n';
+			}
+
+			protected function sendMsg_clickHandler(event:MouseEvent):void
+			{
+				var target:String=usersList.selectedItem ? usersList.selectedItem : '*';
+				if (target != '*')
+					msg.text+='你对' + target + '说: ' + msgInput.text + '\n';
+				pomelo.request('chat.chatHandler.send', {content: msgInput.text, rid: roomID, target: target}, function(data:Object):void
+				{
+					trace(data);
+				});
+			}
+
+			protected function leave_clickHandler(event:MouseEvent):void
+			{
+				pomelo.disconnect();
+				currentState='login';
+				connected=false;
+			}
+
+			private var connected:Boolean;
+
+			private function connect():void
+			{
+				pomelo.init("127.0.0.1", 3014, null, function(response:Object):void
+				{
+					if (response.code == 200)
+					{
+						connected=true;
+						if (username.text && room.text)
+							doLogin();
+					}
+				});
+			}
+		]]>
+	</fx:Script>
+
+	<s:states>
+		<s:State name="login"/>
+		<s:State name="chat"/>
+	</s:states>
+
+	<s:layout>
+		<s:VerticalLayout horizontalAlign="center"
+						  verticalAlign="middle"/>
+	</s:layout>
+
+	<s:VGroup includeIn="login">
+		<s:TextInput prompt="用户名"
+					 id="username"/>
+		<s:TextInput prompt="房间名"
+					 id="room"/>
+		<s:Button label="登陆"
+				  id="login"
+				  mouseDown="login_mouseDownHandler(event)"/>
+	</s:VGroup>
+
+	<s:HGroup includeIn="chat">
+		<s:VGroup>
+			<s:Label text="用户列表，选中则只发送消息给该用户"/>
+			<s:List dataProvider="{users}"
+					id="usersList"/>
+		</s:VGroup>
+		<s:VGroup>
+			<s:TextArea id="msg"/>
+			<s:HGroup>
+				<s:TextInput id="msgInput"/>
+				<s:Button label="发送"
+						  id="sendMsg"
+						  click="sendMsg_clickHandler(event)"/>
+			</s:HGroup>
+			<s:Button label="退出"
+					  id="leave"
+					  click="leave_clickHandler(event)"/>
+		</s:VGroup>
+	</s:HGroup>
+
+</s:Application>
