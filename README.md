@@ -9,7 +9,8 @@ Pomelo-Flash-Demo
 使用步骤：
 
 1. npm install pomelo -g
-2. cd server && pomelo start && node crossdomain.js
+2. cd server && npm install
+3. pomelo start && node crossdomain.js
 3. 使用flash里的前端代码运行即可
 
 实现功能：
